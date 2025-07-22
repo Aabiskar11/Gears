@@ -2,8 +2,17 @@
 session_start();
 require_once 'config/database.php';
 
+// Debug: print session and workflow steps if ?debug=1
+$debug = isset($_GET['debug']);
+if ($debug) {
+    echo '<pre>process_order.php: $_SESSION: ';
+    print_r($_SESSION);
+    echo '</pre>';
+}
+
 // Check if user is logged in
 if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+    if ($debug) echo '<b>Not logged in, redirecting to login.php</b><br>';
     header('Location: login.php');
     exit;
 }
@@ -12,6 +21,7 @@ $user_id = $_SESSION['user_id'];
 
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($debug) echo '<b>Not POST, redirecting to checkout.php</b><br>';
     header('Location: checkout.php');
     exit;
 }
@@ -21,14 +31,17 @@ try {
     $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM cart WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $cart_count = $stmt->fetch()['count'];
+    if ($debug) echo "Cart count: $cart_count<br>";
     
     if ($cart_count == 0) {
         $_SESSION['error'] = 'Your cart is empty.';
+        if ($debug) echo '<b>Cart is empty, redirecting to cart.php</b><br>';
         header('Location: cart.php');
         exit;
     }
 } catch (PDOException $e) {
     $_SESSION['error'] = 'Database error occurred.';
+    if ($debug) echo '<b>Database error, redirecting to checkout.php</b><br>';
     header('Location: checkout.php');
     exit;
 }
@@ -112,10 +125,29 @@ try {
     $stmt = $pdo->prepare("DELETE FROM cart WHERE user_id = ?");
     $stmt->execute([$user_id]);
     
-    // Commit transaction
     $pdo->commit();
-    
-    // Process payment based on method
+
+    if ($payment_method === 'esewa') {
+        $_SESSION['esewa_order'] = [
+            'amount' => number_format($total_amount, 2, '.', ''),
+            'tax_amount' => number_format($tax_amount, 2, '.', ''),
+            'total_amount' => number_format($final_total, 2, '.', ''),
+            'transaction_uuid' => $order_number,
+            'product_code' => 'EPAYTEST',
+            'product_service_charge' => 0,
+            'product_delivery_charge' => 0,
+            'success_url' => 'http://localhost/Gears/esewa_success.php',
+            'failure_url' => 'http://localhost/Gears/esewa_failure.php'
+        ];
+        if ($debug) {
+            echo '<b>Set $_SESSION[\'esewa_order\']:</b><br>';
+            print_r($_SESSION['esewa_order']);
+        }
+        header('Location: esewa_payment.php?debug=1');
+        exit;
+    }
+
+    // Process payment based on method (credit_card, paypal)
     $payment_result = processPayment($order_id, $final_total, $payment_method, $_POST);
     
     if ($payment_result['success']) {
@@ -142,7 +174,6 @@ try {
     }
     
 } catch (PDOException $e) {
-    // Rollback transaction
     $pdo->rollBack();
     $_SESSION['error'] = 'An error occurred while processing your order.';
     header('Location: checkout.php');
@@ -176,8 +207,6 @@ function generateOrderNumber() {
 }
 
 function processPayment($order_id, $amount, $payment_method, $payment_data) {
-    // This is a simplified payment processing function
-    // In a real application, you would integrate with actual payment gateways
     
     switch ($payment_method) {
         case 'credit_card':
@@ -190,15 +219,12 @@ function processPayment($order_id, $amount, $payment_method, $payment_data) {
 }
 
 function processCreditCardPayment($order_id, $amount, $payment_data) {
-    // Simulate credit card processing
-    // In a real application, you would integrate with Stripe, Square, or other payment processors
     
     $card_number = $payment_data['card_number'] ?? '';
     $expiry_date = $payment_data['expiry_date'] ?? '';
     $cvv = $payment_data['cvv'] ?? '';
     $card_holder_name = $payment_data['card_holder_name'] ?? '';
     
-    // Basic validation
     if (empty($card_number) || empty($expiry_date) || empty($cvv) || empty($card_holder_name)) {
         return ['success' => false, 'message' => 'Please provide all credit card details'];
     }
@@ -230,13 +256,10 @@ function processCreditCardPayment($order_id, $amount, $payment_data) {
 }
 
 function processPayPalPayment($order_id, $amount, $payment_data) {
-    // Simulate PayPal processing
-    // In a real application, you would integrate with PayPal API
-    
-    // Simulate payment processing delay
+    y
     sleep(1);
     
-    // Simulate success (95% success rate for demo)
+    
     $success = (rand(1, 100) <= 95);
     
     if ($success) {

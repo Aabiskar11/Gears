@@ -11,7 +11,6 @@ if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['user_name'];
 
-// Get cart data
 $cart_items = [];
 $cart_summary = [
     'item_count' => 0,
@@ -19,11 +18,11 @@ $cart_summary = [
     'total_amount' => 0
 ];
 
-// Get user addresses
+
 $user_addresses = [];
 
 try {
-    // Get cart items
+    
     $stmt = $pdo->prepare("
         SELECT 
             c.id as cart_id,
@@ -42,7 +41,7 @@ try {
     $stmt->execute([$user_id]);
     $cart_items = $stmt->fetchAll();
     
-    // Calculate cart summary
+    
     $stmt = $pdo->prepare("
         SELECT 
             COUNT(c.id) as item_count,
@@ -60,11 +59,9 @@ try {
     $stmt->execute([$user_id]);
     $user_addresses = $stmt->fetchAll();
     
-} catch (PDOException $e) {
-    // Handle error silently
-}
+} 
 
-// Redirect if cart is empty
+
 if (empty($cart_items)) {
     header('Location: cart.php');
     exit;
@@ -535,6 +532,10 @@ if (empty($cart_items)) {
                                 <input type="radio" name="payment_method" value="paypal" id="paypal">
                                 <label for="paypal">PayPal</label>
                             </div>
+                            <div class="payment-method" onclick="selectPaymentMethod('esewa')">
+                                <input type="radio" name="payment_method" value="esewa" id="esewa">
+                                <label for="esewa">eSewa</label>
+                            </div>
                         </div>
                         
                         <div id="credit-card-fields" style="display: none;">
@@ -606,11 +607,9 @@ if (empty($cart_items)) {
                 option.classList.remove('selected');
             });
             
-            // Add selected class to clicked option
+            
             event.currentTarget.classList.add('selected');
             
-            // Here you would typically fetch the address details and populate the form
-            // For now, we'll just mark it as selected
         }
 
         function toggleBillingAddress() {
